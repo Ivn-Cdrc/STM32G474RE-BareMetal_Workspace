@@ -3,6 +3,8 @@
 // Pin: 5
 // Bus: AHB2
 
+#include <stdint.h>
+
 // Defining the beginning or the starting point of the peripheral memory block (ref. to reference manual)
 // NOTE: BASE simply means starting point when referring to memory addresses
 #define PERIPH_BASE         (0x40000000UL)
@@ -32,11 +34,11 @@
 
 // MODER register defines if GPIO PIN is set to either an input or output PIN
 #define MODE_R_OFFSET       (0x00UL)
-#define GPIOA_MODE_R         (*(volatile unsigned int *) (GPIOA_BASE + MODE_R_OFFSET))
+#define GPIOA_MODE_R        (*(volatile unsigned int *) (GPIOA_BASE + MODE_R_OFFSET))
 
 // ODR (Output Data Register)
 #define OD_R_OFFSET         (0x14UL)
-#define GPIOA_OD_R           (*(volatile unsigned int *) (GPIOA_BASE + OD_R_OFFSET))
+#define GPIOA_OD_R          (*(volatile unsigned int *) (GPIOA_BASE + OD_R_OFFSET))
 
 // 0b 0000 0000 0000 0000 0000 0000 0000 0001 - In other words, shift 1 at the position of zero
 // We can think of the above as the state of the register
@@ -47,26 +49,41 @@
 #define PIN5                (1U<<5)
 #define LED_PIN             PIN5
 
-// Reset value: 0xABFF FFFF (for port A), so we will have to set the value of bit 10 & 11 to 1 & 0 respectively
-// (1U<<10) Set bit 10 to 1
-//  &=~(1U<<11) Set bit 11 to 0 by inverting 1 (NOT 1) using tilde operator. If we want to set any particular bit to 0
-//  use &=~
+typedef struct {
+    volatile uint32_t DUMMY[19]; /*DUMMY,                               Address: 0x00-0x48 */
+    volatile uint32_t AHB2ENR; /*!< RCC AHB2 peripheral clock register, Address offset: 0x4C */
+} RCC_TypeDef;
+
+// The peripheral is a structure
+// All registers belonging to a peripheral are members of the structure
+typedef struct {
+    volatile uint32_t MODER;    /*!< GPIO port mode register,           Address offset: 0x00 */
+    volatile uint32_t DUMMY[4];  /*DUMMY used to preserve order of members in struct. Each member occupies 4 bytes (32 bits) */
+    volatile uint32_t ODR;      /*!< GPIO port output data register,    Address offset: 0x14 */
+} GPIO_TypeDef;
+
+#define RCC                 ((RCC_TypeDef*) RCC_BASE)
+#define GPIOA               ((GPIO_TypeDef*) GPIOA_BASE)
 
 int main(void) {
     // 1. Enable clock access to GPIOA
     // Using the | (OR) operator, no other bits will be changed, except those specified in GPIOAEN (Bit-0)
-    RCC_AHB2EN_R |= GPIOAEN;
+    // RCC_AHB2EN_R |= GPIOAEN;
+    RCC->AHB2ENR |= GPIOAEN;
 
     // 2. Set PA5 as output pin
-    GPIOA_MODE_R |= (1U<<10); // |= ensures only bit-10 is set to 1
-    GPIOA_MODE_R &=~(1U<<11); // &=~ ensures only bit-11 is set to 0
+    // GPIOA_MODE_R |= (1U<<10); // |= ensures only bit-10 is set to 1
+    // GPIOA_MODE_R &=~(1U<<11); // &=~ ensures only bit-11 is set to 0
+    GPIOA->MODER |= (1U<<10);
+    GPIOA->MODER &=~(1U<<11);
 
     while (1) {
         // 3. Set PA5 high (1)
         // GPIOA_OD_R |= LED_PIN;
 
         // 4. Experiment 2, toggle PA5. ^= is the toggle operator which alternates value of LED_PIN with each loop
-        GPIOA_OD_R ^= LED_PIN;
+        // GPIOA_OD_R ^= LED_PIN;
+        GPIOA->ODR ^= LED_PIN;
         for (int i = 0; i < 100000; i++) {} // for-loop is used to add a delay
     }
 }
